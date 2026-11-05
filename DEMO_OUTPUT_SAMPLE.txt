@@ -1,0 +1,36 @@
+
+=== FIRST SESSION (SIMULATED INTERRUPTION) ===
+agent: memory_enabled
+completed: False
+status: in_progress
+execution_steps_this_session: 2
+pending_steps: ['step-3', 'step-4']
+failures_total: 0
+elapsed_seconds: 0.001231
+compact_context_size_chars: 448
+memory_processing_seconds: 0.00115
+memory_file: /mnt/data/long_horizon_agent_checkpoint/data/task_memory.json
+
+=== RESUMED SESSION ===
+agent: memory_enabled
+completed: True
+status: completed
+execution_steps_this_session: 2
+pending_steps: []
+failures_total: 0
+elapsed_seconds: 0.000592
+compact_context_size_chars: 644
+memory_processing_seconds: 0.000526
+memory_file: /mnt/data/long_horizon_agent_checkpoint/data/task_memory.json
+
+Inspect persisted state: /mnt/data/long_horizon_agent_checkpoint/data/task_memory.json
+Spreadsheet runtime warmup failed during python startup
+Traceback (most recent call last):
+  File "/tmp/tmp.QlpUkOUI9D/artifact_tool_v2-2.8.66/artifact_tool/patches/warm_spreadsheet_runtime_on_startup.py", line 26, in warm_spreadsheet_runtime_on_startup
+  File "/tmp/tmp.QlpUkOUI9D/artifact_tool_v2-2.8.66/artifact_tool/spreadsheet_warmup.py", line 785, in warm_spreadsheet_runtime
+  File "/tmp/tmp.QlpUkOUI9D/artifact_tool_v2-2.8.66/artifact_tool/spreadsheet_warmup.py", line 718, in _warm_feature_flows
+  File "/tmp/tmp.QlpUkOUI9D/artifact_tool_v2-2.8.66/artifact_tool/spreadsheet_warmup.py", line 509, in _warm_drawing_and_image_flows
+  File "/tmp/tmp.QlpUkOUI9D/artifact_tool_v2-2.8.66/artifact_tool/generated/interface/models.py", line 32861, in bring_to_front
+  File "/tmp/tmp.QlpUkOUI9D/artifact_tool_v2-2.8.66/artifact_tool/rpc/remote.py", line 764, in __call__
+  File "/tmp/tmp.QlpUkOUI9D/artifact_tool_v2-2.8.66/artifact_tool/rpc/client.py", line 175, in call
+artifact_tool.rpc.client.RemoteError: Element ordering requires an owning element collection.
