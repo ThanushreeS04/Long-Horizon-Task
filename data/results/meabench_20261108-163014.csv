@@ -1,0 +1,5 @@
+steps,agent,trials,completion_pct,unique_verified,llm_calls,repeated_steps,rejected_attempts,replan_events,blocked_steps,input_tokens,peak_prompt_tokens,recall_pct
+40,baseline,5,100.0,40.0,88.6,26.0,22.6,4.0,0.0,357124.6,10757.0,100.0
+40,memory+replan,5,100.0,40.0,56.6,0.0,16.6,2.0,0.0,23668.2,617.8,100.0
+40,mea no-replan,5,0.0,21.8,33.8,0.0,12.0,0.0,1.8,4544.2,158.4,0.0
+40,mea+replan,5,100.0,40.0,56.6,0.0,16.6,2.0,0.0,8221.8,657.2,100.0

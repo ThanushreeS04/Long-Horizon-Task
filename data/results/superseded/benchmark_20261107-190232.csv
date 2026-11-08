@@ -1,0 +1,3 @@
+steps,agent,trials,completion_pct,verified_steps,llm_calls,repeated_steps,replans,integrity_flags,rejected_attempts,input_tokens,output_tokens,peak_prompt_tokens,avg_prompt_tokens,recall_pct,memory_seconds,elapsed_seconds,peak_python_kb
+10,mea,1,100.0,10.0,10.0,0.0,0.0,0.0,0.0,1185.0,2424.0,213.0,118.5,100.0,0.42,0.48,243.5
+10,mea+replan,1,100.0,10.0,10.0,0.0,0.0,0.0,0.0,1185.0,2424.0,213.0,118.5,100.0,0.27,0.32,224.4

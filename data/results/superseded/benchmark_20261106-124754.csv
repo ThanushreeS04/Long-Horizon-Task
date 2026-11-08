@@ -1,0 +1,3 @@
+steps,agent,trials,completion_pct,verified_steps,llm_calls,repeated_steps,input_tokens,output_tokens,peak_prompt_tokens,avg_prompt_tokens,recall_pct,memory_seconds,elapsed_seconds,peak_python_kb
+6,baseline,3,67.0,5.67,11.67,4.0,5103.33,2028.0,1095.33,431.03,73.33,0.0,276.45,174.4
+6,memory,3,100.0,6.0,7.67,0.0,1619.0,1283.67,238.67,210.73,100.0,0.45,164.34,167.43

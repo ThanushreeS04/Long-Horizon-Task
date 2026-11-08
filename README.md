@@ -1,33 +1,93 @@
-# Long-Horizon Agents — Core Implementation Checkpoint
+# Long-Horizon Agents: Memory Management Module
 
-This runnable prototype demonstrates two comparable agents:
-- **BaselineAgent:** no persistent task-state storage.
-- **MemoryEnabledAgent:** JSON task-state storage, context retrieval, step history, verification, and resumption.
+A runnable prototype that compares three agents on the same multi-step task,
+including a simulated crash half-way through:
 
-## Scope note
-The planner and environment are deterministic in this checkpoint version. This makes the memory workflow testable without an API key, but it is not yet an LLM-backed autonomous coding agent. A model adapter and real repository tools can be added next.
+- **Baseline**: no persistent memory. Puts its whole work log in every prompt.
+  After a crash it restarts from step 1.
+- **Memory agent**: a JSON task-state store (`MemoryManager`), a bounded
+  context in every prompt, and resume-after-crash.
+- **MEA agent**: a Manager -> Executor -> Auditor loop on top of the same store,
+  after the LongHorizon-Harness paper: the Manager writes a contract for each
+  step, the Executor sees only that contract in a fresh context, and the
+  Auditor checks the output independently. A Replanner replaces a step that
+  keeps failing.
 
 ## Requirements
-Python 3.11 or 3.12. No third-party packages.
+Python 3.11 or newer. No third-party packages.
+Optional: [Ollama](https://ollama.com) for a real local model.
 
-## Run
-```bash
-python main.py demo
-python main.py memory-demo
-python -m unittest discover -s tests -v
+## Run the tests
+```
+python -m unittest discover -s tests
 ```
 
-`demo` runs both agents and writes `data/evaluation_results.json`.
-`memory-demo` executes two steps, saves state, creates a new agent instance, and resumes from `data/task_memory.json`.
-`reset` deletes generated JSON files.
+## Run on the mock model (offline, fast)
+```
+python solve.py "Plan a product launch" --steps 8 --only all
+python bench.py --sizes 10 40 80 --trials 3
+python mea_bench.py
+python report_tables.py data\benchmark_<stamp>.json
+```
+
+## Run on a real local model
+In a separate window, leave this running:
+```
+ollama serve
+ollama pull qwen2.5:3b
+```
+Then:
+```
+python solve.py "Plan a simple calculator program" --steps 6 --only all --llm ollama --model qwen2.5:3b
+python bench.py --sizes 6 --trials 3 --llm ollama --model qwen2.5:3b
+```
+
+## Scripts
+| Script | Purpose |
+|---|---|
+| `solve.py` | Give one task to one or more agents; prints a comparison table and saves a how-to guide |
+| `bench.py` | Repeated runs over several task lengths; saves JSON and CSV |
+| `mea_bench.py` | Same, with injected failures (dead steps, transient faults, crashes) |
+| `recovery_bench.py`, `workflow_bench.py` | Earlier failure and replanning benchmarks |
+| `report_tables.py` | Turns a benchmark JSON into a markdown table |
+| `main.py` | Original deterministic demo (`demo`, `memory-demo`, `evaluate`, `reset`) |
+
+## Code layout (`agents/`)
+| File | Role |
+|---|---|
+| `memory_manager.py` | JSON store: create/load, record attempts, bounded context, compaction |
+| `manager.py` | Manager: reads state, returns execute / done / blocked / ask, writes the step contract |
+| `mea.py` | Executor, Auditor (status + integrity) and the loop controller `MEAAgent` |
+| `replanner.py` | Replaces a step after repeated rejections, using the saved rejection reason |
+| `taskstate.py` | Requirement / fact / artifact records with status and evidence pointers |
+| `llm.py` | Mock, Ollama and Anthropic backends behind one `complete()` |
+| `llm_agents.py` | Plan generation, rule-based auditor, baseline and memory agents |
+| `workflow.py` | Earlier agents with step dependencies and mechanical replanning |
 
 ## Memory record
-The JSON state includes the task goal, status, plan, pending step IDs, step history, errors, findings, summary, timestamps, and verification evidence. Only audited steps are removed from the pending list.
+The JSON state holds the goal, status, plan, pending step ids, step history,
+errors, findings, summary, timestamps and verification evidence. Only audited
+steps leave the pending list. The MEA agent also stores records and artifacts
+(see `taskstate.py`).
 
-## Metrics
-The prototype records elapsed time, completion, execution steps, failures, compact-context size, and memory-processing time. Token usage is not reported because no LLM API is called yet.
+## How to read the results
+- On the mock model the numbers show the mechanism, not model accuracy.
+- Input tokens are estimated (characters / 4). Output tokens and time from
+  Ollama are measured.
+- The real-model samples are small (a 3B model, few trials).
+- The baseline has no truncation or summarisation, so its token numbers are an
+  upper bound.
+- Python RAM is not lower for the memory-based agents, and MEA uses more memory
+  time than the memory agent.
 
-## Next stages
-1. Add an LLM-backed planner behind the same interface.
-2. Replace the demo environment with safe repository tools.
-3. Improve history compaction and add multiple tasks/trials.
+## Known limitations
+- The auditor checks format and traceability (a `FACT-n` label, the step's code,
+  minimum length). It cannot tell whether a statement is true.
+- Manager, Auditor and Replanner are rule-based, not model-based as in the paper.
+  There is no per-role model routing and no per-role cost split.
+- The memory agent's context budget must be tuned to task length (the default
+  fails at 80 steps).
+- Failures in the benchmarks are synthetic.
+- The environment is simulated; nothing touches a real repository.
+- LangGraph integration (listed as future work earlier) was not done; a custom
+  loop is used instead.

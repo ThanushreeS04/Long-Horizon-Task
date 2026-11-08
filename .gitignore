@@ -1,9 +1,9 @@
-Set-Content -Path .gitignore -Encoding ascii -Value @"
 __pycache__/
 *.pyc
 .venv/
 venv/
 data/*
 !data/results/
+outputs/
 *_backup.py
-"@
+*.bak
