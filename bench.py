@@ -22,7 +22,8 @@ from solve import merge, recall
 ROOT = Path(__file__).resolve().parent
 DATA = ROOT / "data"
 DEFAULT_TASK = "Research three database options, compare their costs, and write a recommendation"
-AGENTS = ["baseline", "memory", "memory+criteria", "mea", "mea+replan"]
+AGENTS = ["baseline", "baseline+criteria", "baseline-window", "memory", "memory+criteria",
+          "mea", "mea+replan", "mea+llmplan", "mea+llmaudit"]
 DEFAULT_AGENTS = ["baseline", "memory", "mea"]
 
 
@@ -37,7 +38,7 @@ def measured(fn):
     return result, round(peak / 1024, 1)
 
 
-def one_trial(llm, goal, n, k, budget, workdir, trial_id, agents):
+def one_trial(llm, goal, n, k, budget, workdir, trial_id, agents, window=3):
     steps, _ = make_plan(llm, goal, n)
     task = {"task_id": trial_id, "goal": goal, "success_criteria": [], "steps": steps}
 
@@ -50,6 +51,8 @@ def one_trial(llm, goal, n, k, budget, workdir, trial_id, agents):
 
     makers = {
         "baseline": lambda: two_sessions(lambda: LLMBaselineAgent(llm)),
+        "baseline+criteria": lambda: two_sessions(lambda: LLMBaselineAgent(llm, criteria=True)),
+        "baseline-window": lambda: two_sessions(lambda: LLMBaselineAgent(llm, window=window)),
         "memory": lambda: two_sessions(
             lambda: LLMMemoryAgent(llm, workdir / f"{trial_id}_memory.json", budget)),
         "memory+criteria": lambda: two_sessions(
@@ -58,6 +61,11 @@ def one_trial(llm, goal, n, k, budget, workdir, trial_id, agents):
             lambda: MEAAgent(llm, workdir / f"{trial_id}_mea.json", replan=False)),
         "mea+replan": lambda: two_sessions(
             lambda: MEAAgent(llm, workdir / f"{trial_id}_mear.json", replan=True)),
+        "mea+llmplan": lambda: two_sessions(
+            lambda: MEAAgent(llm, workdir / f"{trial_id}_mela.json", replan=False,
+                             llm_replan="always")),
+        "mea+llmaudit": lambda: two_sessions(
+            lambda: MEAAgent(llm, workdir / f"{trial_id}_mel.json", replan=False, llm_audit=True)),
     }
     rows = {}
     for name in agents:
@@ -70,6 +78,8 @@ def one_trial(llm, goal, n, k, budget, workdir, trial_id, agents):
                       "llm_calls": r["llm_calls"], "repeated_steps": r["repeated_steps"],
                       "replans": r["replans"], "integrity_flags": r["integrity_flags"],
                       "rejected_attempts": r["rejected_attempts"],
+                      "llm_replans": r["llm_replans"],
+                      "llm_audit_disagreements": r["llm_audit_disagreements"],
                       "input_tokens": r["input_tokens"], "output_tokens": r["output_tokens"],
                       "peak_prompt_tokens": r["peak_prompt_tokens"],
                       "avg_prompt_tokens": r["avg_prompt_tokens"],
@@ -98,6 +108,8 @@ def main():
     ap.add_argument("--ctx-budget", type=int, default=2000,
                     help="memory agent only: max characters of memory context per prompt")
     ap.add_argument("--task", default=DEFAULT_TASK)
+    ap.add_argument("--baseline-window", type=int, default=3,
+                    help="baseline-window agent only: how many of the latest outputs it keeps")
     args = ap.parse_args()
 
     llm = make_llm(args.llm, args.model)
@@ -113,7 +125,7 @@ def main():
             per_agent = {a: [] for a in args.agents}
             for t in range(1, args.trials + 1):
                 rows = one_trial(llm, args.task, n, k, args.ctx_budget, Path(tmp.name),
-                                 f"{stamp}_{n}_{t}", args.agents)
+                                 f"{stamp}_{n}_{t}", args.agents, args.baseline_window)
                 for name, row in rows.items():
                     per_agent[name].append(row)
                     raw.append({"steps": n, "trial": t, "agent": name, **row})
@@ -132,7 +144,7 @@ def main():
             ("Calls", "llm_calls"), ("Reject", "rejected_attempts"), ("Repeat", "repeated_steps"), ("Replans", "replans"),
             ("InTok", "input_tokens"), ("PeakPrompt", "peak_prompt_tokens"),
             ("Recall%", "recall_pct"), ("MemSec", "memory_seconds"), ("PeakKB", "peak_python_kb")]
-    wid = lambda k: 17 if k == "agent" else 11
+    wid = lambda k: 19 if k == "agent" else 11
     print("\n" + "".join(f"{c:>{wid(k)}}" for c, k in cols))
     print("-" * sum(wid(k) for _, k in cols))
     for row in summary:

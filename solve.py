@@ -52,6 +52,8 @@ def merge(sessions):
             "replan_map": {r["failed"]: r["alternative"]
                            for s in sessions for r in s.get("replan_log", [])},
             "integrity_flags": sum(len(s.get("integrity_events", [])) for s in sessions),
+            "llm_replans": sum(s.get("llm_replans", 0) for s in sessions),
+            "llm_audit_disagreements": sum(s.get("llm_audit_disagreements", 0) for s in sessions),
             "ledger": merge_ledgers([s.get("ledger") for s in sessions]),
             "elapsed_seconds": round(sum(s["elapsed_seconds"] for s in sessions), 4),
             "memory_seconds": round(sum(s["memory_seconds"] for s in sessions), 4)}
@@ -114,6 +116,11 @@ def main():
                          "use a .txt name for a text file)")
     ap.add_argument("--mea-replan", action="store_true",
                     help="let the MEA agent replace steps that keep failing (the baseline and memory agents cannot)")
+    ap.add_argument("--llm-replan", choices=["off", "on_reject", "always"], default="off",
+                    help="MEA only: let a model rewrite the remaining step descriptions after an "
+                         "audited round (on_reject = only after a rejection; max 3 calls)")
+    ap.add_argument("--llm-audit", action="store_true",
+                    help="MEA only: add an advisory model check of each verified step (never blocks)")
     args = ap.parse_args()
 
     goal = args.task or input("Enter your task: ").strip()
@@ -172,11 +179,13 @@ def main():
             sessions = []
             if k:
                 print(f"Session 1: working, will crash after {k} steps ", end="", flush=True)
-                sessions.append(MEAAgent(llm, mea_path, replan=args.mea_replan).run(task, stop_after=k))
+                sessions.append(MEAAgent(llm, mea_path, replan=args.mea_replan, llm_replan=args.llm_replan,
+                                      llm_audit=args.llm_audit).run(task, stop_after=k))
                 print("\nSession 2: reloads the saved state and continues ", end="", flush=True)
             else:
                 print("Working ", end="", flush=True)
-            sessions.append(MEAAgent(llm, mea_path, replan=args.mea_replan).run(task))
+            sessions.append(MEAAgent(llm, mea_path, replan=args.mea_replan, llm_replan=args.llm_replan,
+                                      llm_audit=args.llm_audit).run(task))
             print()
             results["mea"] = merge(sessions)
     finally:
@@ -196,6 +205,8 @@ def main():
             ("LLM calls", lambda r: r["llm_calls"]),
             ("Attempts rejected by auditor", lambda r: r["rejected_attempts"]),
             ("Replans", lambda r: r["replans"]),
+            ("LLM replans (applied)", lambda r: r["llm_replans"]),
+            ("LLM audit disagreements", lambda r: r["llm_audit_disagreements"]),
             ("Integrity flags", lambda r: r["integrity_flags"]),
             ("Steps redone after crash", lambda r: r["repeated_steps"]),
             ("Input tokens (estimated)" if llm.name != "anthropic" else "Input tokens",

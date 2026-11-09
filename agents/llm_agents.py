@@ -175,9 +175,10 @@ def _report(agent, stats, interrupted, elapsed, memory_seconds=0.0):
 class LLMBaselineAgent:
     """No persistence. Full history of this session is placed in every prompt."""
 
-    def __init__(self, llm, window=None):
+    def __init__(self, llm, window=None, criteria=False):
         self.llm = llm
         self.window = window or None      # keep only the last N outputs in the prompt (None = keep all)
+        self.criteria = criteria          # control: also state the acceptance criteria, as MEA does
 
     def run(self, task, stop_after=None):
         start, stats, log = time.perf_counter(), _Stats(), []
@@ -188,8 +189,13 @@ class LLMBaselineAgent:
                 break
             kept = log[-self.window:] if self.window else log
             history = "\n\n".join(kept) if kept else "(nothing yet)"
+            rules = step_rules(step)
+            if self.criteria:
+                from .manager import acceptance_for      # lazy import: manager imports this module
+                rules = "Acceptance criteria:\n" + "\n".join(
+                    f"- {a}" for a in acceptance_for(step)) + "\n" + rules
             base_prompt = (f"Task goal: {task['goal']}\n\nFull work log so far:\n{history}\n\n"
-                           f"Now do {step['id']}: {step['description']}\n{step_rules(step)}")
+                           f"Now do {step['id']}: {step['description']}\n{rules}")
             prompt, verified = base_prompt, False
             for _ in range(MAX_ATTEMPTS):
                 result = _execute(self.llm, prompt, step, stats)

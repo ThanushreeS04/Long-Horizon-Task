@@ -1,0 +1,5 @@
+steps,agent,trials,completion_pct,verified_steps,llm_calls,repeated_steps,replans,integrity_flags,rejected_attempts,input_tokens,output_tokens,peak_prompt_tokens,avg_prompt_tokens,recall_pct,memory_seconds,elapsed_seconds,peak_python_kb
+8,baseline,3,67.0,6.0,12.33,3.67,0.0,0.0,3.33,5734.0,1956.67,1094.33,448.93,66.67,0.0,200.85,174.7
+8,baseline-window,3,0.0,7.0,17.0,5.67,0.0,0.0,6.0,8126.0,3701.33,865.67,469.7,42.9,0.0,395.58,185.4
+8,memory+criteria,3,100.0,8.0,8.0,0.0,0.0,0.0,0.0,2695.0,532.33,425.0,336.87,100.0,0.16,88.16,179.9
+8,mea,3,100.0,8.0,8.33,0.0,0.0,0.0,0.33,1337.67,780.67,451.0,160.2,100.0,0.28,90.39,232.83

@@ -35,6 +35,10 @@ class MockLLM:
             clauses = clauses or [meta["goal"]]
             n = meta["n"]
             text = json.dumps([f"Phase {i + 1}: work on '{clauses[i % len(clauses)]}'" for i in range(n)])
+        elif kind == "replan":
+            text = json.dumps([d + " (revised after audit)" for d in meta["descriptions"]])
+        elif kind == "audit":
+            text = "YES. The output carries out the step."
         elif kind == "final":
             seen = {}
             for num, val in re.findall(r'FACT-(\d+): ([^"\\\n]*)', prompt):
