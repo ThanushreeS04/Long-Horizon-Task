@@ -23,37 +23,47 @@ Python 3.11 or newer. No third-party packages.
 Optional: [Ollama](https://ollama.com) for a real local model (tested with `qwen2.5:3b` on CPU).
 
 ## Run the tests
+~~~
 python -m unittest discover -s tests
+~~~
 75 tests, about 12 seconds, no model and no network (a fake local server is
 used for the timeout test). The suite is a reduced core set chosen by
 per-test line coverage from an earlier 190 tests.
 
 ## Run on the mock model (offline, fast)
-python solve.py “Plan a product launch” --steps 8 --only all
+~~~
+python solve.py "Plan a product launch" --steps 8 --only all
 python bench.py --sizes 10 40 80 --trials 3 --ctx-budget 4000
 python mea_bench.py
 python memory_size_bench.py
 python make_charts.py
 python report_tables.py data\results\benchmark_<stamp>.json
+~~~
 
 
 ## Run on a real local model
 In a separate window, leave this running:
 
+~~~
 ollama serve
 ollama pull qwen2.5:3b
+~~~
 
 Then:
 
-python solve.py “Plan a simple calculator program” --steps 6 --only all --llm ollama --model qwen2.5:3b
+~~~
+python solve.py "Plan a simple calculator program" --steps 6 --only all --llm ollama --model qwen2.5:3b
 python bench.py --sizes 6 --trials 3 --llm ollama --model qwen2.5:3b
+~~~
 
 Real runs are slow on a laptop CPU (a full benchmark can take an hour). Set
 `LH_TIMEOUT` (seconds, default 900) to cap how long one model call may take.
 
 ## Dashboard
 
+~~~
 python frontend.py
+~~~
 
 Open http://127.0.0.1:8000. Pick the task, steps, backend (Mock by default) and
 which agents to run; a Stop button ends a running job. The page shows the
