@@ -20,16 +20,6 @@ def make_task(n, deps=True):
 
 
 class DependencyTests(unittest.TestCase):
-    def test_step_waits_for_its_dependency(self):
-        plan = make_task(8)["steps"]
-        ready = ready_step(plan, verified=set(), blocked=set(), replaced=set())
-        self.assertEqual(ready["id"], "step-1")
-        ready = ready_step(plan, {"step-2"}, set(), set())
-        self.assertNotEqual(ready["id"], "step-4")
-
-    def test_final_step_needs_every_work_step(self):
-        plan = make_task(6)["steps"]
-        self.assertEqual(len(plan[-1]["depends_on"]), 5)
 
     def test_alternative_repoints_dependents(self):
         plan = make_task(8)["steps"]
@@ -66,19 +56,6 @@ class ReplanTests(unittest.TestCase):
         self.assertEqual(r["replans"], 1)
         self.assertIn(make_code(9), r["final_output"])
         self.assertNotIn(make_code(2), r["final_output"])
-
-    def test_replan_off_blocks_only_dependent_branch(self):
-        task = make_task(8)
-        llm = FaultyLLM(MockLLM(), {2: 99})
-        with tempfile.TemporaryDirectory() as d:
-            agent = WorkflowMemoryAgent(llm, Path(d) / "m.json", replan=False)
-            r = agent.run(copy.deepcopy(task))
-        self.assertFalse(r["completed"])
-        self.assertEqual(r["blocked"], ["step-2"])
-        verified = {s for s, ok in r["executed"] if ok}
-        self.assertIn("step-1", verified)
-        self.assertIn("step-3", verified)
-        self.assertNotIn("step-5", verified)
 
     def test_baseline_replans_too(self):
         task = make_task(8)

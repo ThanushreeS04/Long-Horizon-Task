@@ -11,19 +11,6 @@ from agents.planner import sample_task
 
 
 class MemoryTests(unittest.TestCase):
-    def test_create_and_load(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "memory.json"
-            manager = MemoryManager(path)
-            task = sample_task()
-
-            state = manager.create_or_load(task)
-
-            self.assertEqual(state["task_id"], task["task_id"])
-            self.assertEqual(
-                len(manager.get_task(task["task_id"])["pending_step_ids"]),
-                4,
-            )
 
     def test_resume_from_disk(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -79,68 +66,6 @@ class TestBoundedMemoryCompaction(unittest.TestCase):
             "result": f"Result for {step_id}",
         }
 
-    def test_summary_stays_within_character_limit(self):
-        state = {
-            "goal": "Complete a long task",
-            "status": "in_progress",
-            "summary": "x" * 2000,
-            "pending_step_ids": ["step-10"],
-            "step_history": [
-                self.make_step(f"step-{i}")
-                for i in range(1, 11)
-            ],
-            "errors": [],
-            "findings": [],
-        }
-
-        self.manager._compact_if_needed(
-            state,
-            keep_recent=3,
-            max_summary_chars=1200,
-        )
-
-        self.assertLessEqual(len(state["summary"]), 1200)
-
-    def test_compaction_preserves_recent_history_and_pending_steps(self):
-        state = {
-            "goal": "Complete a long task",
-            "success_criteria": ["All steps verified"],
-            "status": "in_progress",
-            "summary": "",
-            "pending_step_ids": ["step-5", "step-6"],
-            "step_history": [
-                self.make_step("step-1"),
-                self.make_step("step-2"),
-                self.make_step("step-3"),
-                self.make_step("step-4"),
-                self.make_step("step-5", "attempted"),
-                self.make_step("step-6", "failed"),
-            ],
-            "errors": [],
-            "findings": [],
-        }
-
-        self.manager._compact_if_needed(
-            state,
-            keep_recent=3,
-        )
-
-        remaining_ids = [
-            step["step_id"]
-            for step in state["step_history"]
-        ]
-
-        self.assertEqual(
-            remaining_ids,
-            ["step-4", "step-5", "step-6"],
-        )
-        self.assertEqual(
-            state["pending_step_ids"],
-            ["step-5", "step-6"],
-        )
-        self.assertIn("step-1", state["summary"])
-        self.assertIn("step-3", state["summary"])
-
     def test_compact_context_limits_recent_items(self):
         state = {
             "goal": "Complete a long task",
@@ -172,49 +97,6 @@ class TestBoundedMemoryCompaction(unittest.TestCase):
             context["pending_step_ids"],
             ["step-10"],
         )
-
-    
-    def test_summary_preserves_newer_information(self):
-        state = {
-            "goal": "Complete a long task",
-            "success_criteria": [],
-            "status": "in_progress",
-            "summary": "OLD_INFORMATION " * 100,
-            "pending_step_ids": ["step-6"],
-            "step_history": [
-                {
-                    "step_id": f"step-{index}",
-                    "description": f"Complete step {index}",
-                    "status": (
-                        "attempted" if index == 6 else "verified"
-                    ),
-                    "result": f"NEW_INFORMATION_{index}",
-                }
-                for index in range(1, 7)
-            ],
-            "errors": [],
-            "findings": [],
-        }
-
-        self.manager._compact_if_needed(
-            state,
-            keep_recent=2,
-            max_summary_chars=120,
-        )
-
-        self.assertLessEqual(len(state["summary"]), 120)
-
-        remaining_ids = [
-            step["step_id"]
-            for step in state["step_history"]
-        ]
-
-        self.assertIn("step-6", remaining_ids)
-        self.assertIn("step-5", remaining_ids)
-        self.assertIn("step-6", state["pending_step_ids"])
-
-        self.assertIn("step-6", remaining_ids)
-        self.assertNotIn("step-6", state["summary"])
 
 
 

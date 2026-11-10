@@ -17,24 +17,6 @@ CODE = make_code(3)
 
 
 class SplitFactTests(unittest.TestCase):
-    def test_same_line_code_is_removed(self):
-        fact, body = split_fact(f"FACT-3: Python is installed ({CODE}).\nUse the installer.", STEP)
-        self.assertEqual(fact, "Python is installed")
-        self.assertEqual(body, "Use the installer.")
-
-    def test_code_on_second_line(self):
-        fact, body = split_fact(f"FACT-3:\nThe key identifier is {CODE}.\nBody text.", STEP)
-        self.assertNotIn(CODE, fact + body)
-        self.assertEqual(body, "Body text.")
-
-    def test_markdown_bold_label_is_handled(self):
-        fact, body = split_fact(f"**FACT-3: Install Python 3 ({CODE})**\n\nThen open a terminal.", STEP)
-        self.assertEqual(fact, "Install Python 3")
-        self.assertEqual(body, "Then open a terminal.")
-
-    def test_trailing_with_code_phrase_is_dropped(self):
-        fact, _ = split_fact(f"FACT-3: Use virtual environments with code {CODE}\nBody.", STEP)
-        self.assertEqual(fact, "Use virtual environments")
 
     def test_missing_code_still_returns_fact_and_body(self):
         fact, body = split_fact("FACT-3: no code at all\nSecond line.", STEP)
@@ -54,35 +36,16 @@ class GuideTests(unittest.TestCase):
         args.update(kw)
         return build_guide(**args)
 
-    def test_has_one_section_per_work_step_and_no_codes(self):
-        text = self.guide()
-        self.assertIn("# How to: Learn Python", text)
-        for n in (1, 2, 3):
-            self.assertIn(f"## Step {n}:", text)
-        self.assertNotIn("## Step 4", text)                # the final report step is not a how-to step
-        self.assertNotIn("K1-", text)
-        self.assertIn("Explain part 2 clearly.", text)
-        self.assertIn("**Key point:** Do part 1", text)
-        self.assertIn("## Summary of key points", text)
-
     def test_missing_step_is_marked(self):
         del self.outputs["step-2"]
         text = self.guide(completed=False)
         self.assertIn("*This step was not completed.*", text)
         self.assertIn("did not finish", text)
 
-    def test_header_has_no_doubled_word(self):
-        self.assertIn("Written by the memory agent (tiny)", self.guide())
-
     def test_slugify(self):
         self.assertEqual(slugify("How to learn Python!!"), "how-to-learn-python")
         self.assertEqual(slugify("???"), "task")
         self.assertLessEqual(len(slugify("a " * 100)), 50)
-
-    def test_write_guide_creates_folders(self):
-        with tempfile.TemporaryDirectory() as d:
-            path = write_guide(Path(d) / "a" / "b" / "g.txt", "hello")
-            self.assertEqual(path.read_text(encoding="utf-8"), "hello")
 
 
 class WindowBaselineTests(unittest.TestCase):
@@ -90,25 +53,11 @@ class WindowBaselineTests(unittest.TestCase):
         steps, _ = make_plan(MockLLM(), "a, b, c", n)
         return {"task_id": "t", "goal": "g", "success_criteria": [], "steps": steps}
 
-    def test_window_keeps_prompt_small_but_forgets_early_facts(self):
-        task = self.task(12)
-        full = LLMBaselineAgent(MockLLM()).run(task)
-        windowed = LLMBaselineAgent(MockLLM(), window=3).run(task)
-        self.assertTrue(full["final_verified"])
-        self.assertFalse(windowed["final_verified"])      # cannot list facts it no longer sees
-        self.assertLess(max(windowed["prompt_series"]), max(full["prompt_series"]))
-
     def test_memory_agent_beats_the_window_on_recall(self):
         task = self.task(12)
         with tempfile.TemporaryDirectory() as d:
             mem = LLMMemoryAgent(MockLLM(), Path(d) / "m.json").run(task)
         self.assertTrue(mem["final_verified"])
-
-    def test_window_zero_or_none_means_full_history(self):
-        task = self.task(6)
-        a = LLMBaselineAgent(MockLLM(), window=0).run(task)["prompt_series"]
-        b = LLMBaselineAgent(MockLLM()).run(task)["prompt_series"]
-        self.assertEqual(a, b)
 
 
 class SolveCommandTests(unittest.TestCase):

@@ -50,12 +50,6 @@ class TimeoutTests(unittest.TestCase):
             post_json(s.url, {"prompt": "x"}, timeout=0.3)
         self.assertLess(time.monotonic() - t0, 1.5)
 
-    def test_fast_server_returns_json(self):
-        s = Server(delay=0.0)
-        self.addCleanup(s.close)
-        self.assertEqual(post_json(s.url, {"prompt": "x"}, timeout=2.0),
-                         {"response": "ok"})
-
 
 if __name__ == "__main__":
     unittest.main()

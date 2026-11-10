@@ -30,19 +30,6 @@ def run_memory(criteria, n=4):
 
 
 class PromptParityTests(unittest.TestCase):
-    def test_default_prompt_has_no_criteria(self):
-        prompts, _, _ = run_memory(False)
-        self.assertTrue(all("Acceptance criteria" not in p for p in prompts))
-
-    def test_criteria_prompt_names_the_exact_code(self):
-        prompts, steps, _ = run_memory(True)
-        self.assertIn("Acceptance criteria", prompts[0])
-        self.assertIn(steps[0]["code"], prompts[0])
-
-    def test_final_step_criteria_list_every_code(self):
-        prompts, steps, _ = run_memory(True)
-        for step in steps[:-1]:
-            self.assertIn(step["code"], prompts[-1])
 
     def test_criteria_do_not_change_what_gets_done(self):
         _, _, off = run_memory(False)

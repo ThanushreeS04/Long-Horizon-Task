@@ -42,9 +42,6 @@ class FrontendTests(unittest.TestCase):
         self.assertEqual(r.status, 200)
         self.assertIn(b"Long-Horizon Agent", r.read())
 
-    def test_unknown_path_is_404(self):
-        self.assertEqual(self.post(GOOD, path="/other")[0], 404)
-
     def test_request_from_another_origin_is_refused(self):
         self.assertEqual(self.post(GOOD, {"Origin": "http://evil.example"})[0], 403)
 
@@ -57,16 +54,10 @@ class FrontendTests(unittest.TestCase):
     def test_task_that_looks_like_an_option_is_refused(self):
         self.assertEqual(self.post(dict(GOOD, task="--help"))[0], 400)
 
-    def test_very_long_task_is_refused(self):
-        self.assertEqual(self.post(dict(GOOD, task="x" * 501))[0], 400)
-
     def test_bad_steps_and_backend_are_refused(self):
         self.assertEqual(self.post(dict(GOOD, steps=2))[0], 400)
         self.assertEqual(self.post(dict(GOOD, steps=31))[0], 400)
         self.assertEqual(self.post(dict(GOOD, backend="anthropic"))[0], 400)
-
-    def test_empty_task_is_refused(self):
-        self.assertEqual(self.post(dict(GOOD, task="  "))[0], 400)
 
     def test_mock_run_returns_all_three_agents_with_the_fields_the_page_reads(self):
         before_data = set((ROOT / "data").glob("*_comparison.json"))

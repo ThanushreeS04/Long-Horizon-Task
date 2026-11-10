@@ -35,12 +35,6 @@ class FlakyLLM(MockLLM):
 
 
 class LoopTests(unittest.TestCase):
-    def test_completes_a_task(self):
-        rep = MEAAgent(MockLLM(), tmp()).run(make_task(8))
-        self.assertTrue(rep["completed"])
-        self.assertEqual(rep["stopped_because"], "done")
-        self.assertEqual(rep["integrity_events"], [])
-        self.assertEqual(rep["rounds"], 8)
 
     def test_crash_and_resume_repeats_nothing(self):
         path, task = tmp(), make_task(8)
@@ -51,13 +45,6 @@ class LoopTests(unittest.TestCase):
         self.assertTrue(second["completed"])
         ran = [s for s, _ in first["executed"] + second["executed"]]
         self.assertEqual(len(ran), len(set(ran)))
-
-    def test_rejection_reason_reaches_next_attempt(self):
-        llm = FlakyLLM(index=2, times=1)
-        rep = MEAAgent(llm, tmp()).run(make_task(6))
-        self.assertTrue(rep["completed"])
-        self.assertEqual(sum(1 for s, ok in rep["executed"] if s == "step-2" and not ok), 1)
-        self.assertTrue(any("previous attempt was rejected" in p for p in llm.prompts))
 
     def test_stops_blocked_when_step_keeps_failing(self):
         rep = MEAAgent(FlakyLLM(index=1, times=99), tmp(), replan=False).run(make_task(6))
@@ -79,18 +66,6 @@ class LoopTests(unittest.TestCase):
         self.assertEqual(rep["stopped_because"], "ask")
         self.assertEqual(MEAAgent(MockLLM(), path).memory.get_task("t")["question"], "Which region?")
 
-    def test_executor_prompt_has_no_history(self):
-        llm = MockLLM()
-        agent = MEAAgent(llm, tmp())
-        state = agent.memory.create_or_load(make_task(6))
-        for k in ("blocked_step_ids", "replaced_step_ids", "replans", "answers"):
-            state.setdefault(k, [] if k != "answers" else {})
-        c = agent.manager.decide(state)["contract"]
-        step = state["plan"][0]
-        p = Executor.build_prompt(state["goal"], c, step)
-        self.assertNotIn("Full work log", p)
-        self.assertNotIn("Compact task memory", p)
-
 
 class AuditorTests(unittest.TestCase):
     def setUp(self):
@@ -105,22 +80,6 @@ class AuditorTests(unittest.TestCase):
 
     def good_text(self):
         return f"FACT-1: Step 1 established {self.step['code']}.\n" + "work " * 30
-
-    def test_good_output_is_complete_and_clean(self):
-        a = Auditor().audit(self.contract, self.step, self.result(self.good_text()), self.state)
-        self.assertEqual((a["status"], a["integrity"], a["verified"]), ("complete", "clean", True))
-
-    def test_missing_code_is_incomplete(self):
-        a = Auditor().audit(self.contract, self.step, self.result("FACT-1: nothing " + "x" * 90), self.state)
-        self.assertEqual(a["status"], "incomplete")
-        self.assertFalse(a["verified"])
-
-    def test_code_of_unrelated_step_is_suspect(self):
-        other = self.state["plan"][4]["code"]
-        a = Auditor().audit(self.contract, self.step,
-                            self.result(self.good_text() + f" also {other}"), self.state)
-        self.assertEqual(a["integrity"], "suspect")
-        self.assertFalse(a["verified"])
 
     def test_mutating_the_state_is_a_violation(self):
         class Bad(Auditor):

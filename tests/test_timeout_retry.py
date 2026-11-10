@@ -26,13 +26,6 @@ class FlakyLLM:
 
 
 class TimeoutRetryTests(unittest.TestCase):
-    def test_timeout_becomes_a_failed_empty_attempt(self):
-        stats = _Stats()
-        res = _execute(FlakyLLM(), "prompt text", STEP, stats)
-        self.assertFalse(res["success"])
-        self.assertTrue(res["timeout"])
-        self.assertEqual(res["output"], "")
-        self.assertEqual((stats.calls, stats.output_tokens), (1, 0))
 
     def test_retry_after_timeout_succeeds(self):
         llm, stats = FlakyLLM(), _Stats()

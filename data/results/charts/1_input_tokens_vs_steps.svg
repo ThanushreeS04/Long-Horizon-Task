@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 440" font-family="Arial, sans-serif">
+<rect width="760" height="440" fill="white"/>
+<text x="380.0" y="26" text-anchor="middle" font-size="17" font-weight="bold">Input tokens vs task length (mock model, crash at 50%, 3 trials, estimated chars/4)</text>
+<text x="18" y="200.0" font-size="12" text-anchor="middle" transform="rotate(-90 18 200.0)">input tokens (log scale)</text>
+<line x1="80" y1="350" x2="730" y2="350" stroke="#333"/>
+<line x1="80" y1="50" x2="80" y2="350" stroke="#333"/>
+<line x1="80" y1="350.0" x2="730" y2="350.0" stroke="#ddd"/>
+<text x="74" y="354.0" font-size="11" text-anchor="end">1,000</text>
+<line x1="80" y1="275.0" x2="730" y2="275.0" stroke="#ddd"/>
+<text x="74" y="279.0" font-size="11" text-anchor="end">10,000</text>
+<line x1="80" y1="200.0" x2="730" y2="200.0" stroke="#ddd"/>
+<text x="74" y="204.0" font-size="11" text-anchor="end">100,000</text>
+<line x1="80" y1="125.0" x2="730" y2="125.0" stroke="#ddd"/>
+<text x="74" y="129.0" font-size="11" text-anchor="end">1,000,000</text>
+<line x1="80" y1="50.0" x2="730" y2="50.0" stroke="#ddd"/>
+<text x="74" y="54.0" font-size="11" text-anchor="end">10,000,000</text>
+<text x="161.2" y="368" font-size="12" text-anchor="middle">10</text>
+<text x="323.8" y="368" font-size="12" text-anchor="middle">20</text>
+<text x="486.2" y="368" font-size="12" text-anchor="middle">40</text>
+<text x="648.8" y="368" font-size="12" text-anchor="middle">80</text>
+<text x="405.0" y="388" font-size="12" text-anchor="middle">task steps</text>
+<polyline points="161.2,259.2 323.8,213.2 486.2,167.6 648.8,122.2" fill="none" stroke="#c0392b" stroke-width="2.5"/>
+<circle cx="161.2" cy="259.2" r="4" fill="#c0392b"/>
+<text x="161.2" y="251.2" font-size="10" text-anchor="middle" fill="#c0392b">16,224</text>
+<circle cx="323.8" cy="213.2" r="4" fill="#c0392b"/>
+<text x="323.8" y="205.2" font-size="10" text-anchor="middle" fill="#c0392b">66,635</text>
+<circle cx="486.2" cy="167.6" r="4" fill="#c0392b"/>
+<text x="486.2" y="159.6" font-size="10" text-anchor="middle" fill="#c0392b">270,182</text>
+<circle cx="648.8" cy="122.2" r="4" fill="#c0392b"/>
+<text x="648.8" y="114.2" font-size="10" text-anchor="middle" fill="#c0392b">1,088,285</text>
+<polyline points="161.2,325.8 323.8,295.6 486.2,262.1 648.8,224.9" fill="none" stroke="#2471a3" stroke-width="2.5"/>
+<circle cx="161.2" cy="325.8" r="4" fill="#2471a3"/>
+<text x="161.2" y="317.8" font-size="10" text-anchor="middle" fill="#2471a3">2,102</text>
+<circle cx="323.8" cy="295.6" r="4" fill="#2471a3"/>
+<text x="323.8" y="287.6" font-size="10" text-anchor="middle" fill="#2471a3">5,308</text>
+<circle cx="486.2" cy="262.1" r="4" fill="#2471a3"/>
+<text x="486.2" y="254.1" font-size="10" text-anchor="middle" fill="#2471a3">14,859</text>
+<circle cx="648.8" cy="224.9" r="4" fill="#2471a3"/>
+<text x="648.8" y="216.9" font-size="10" text-anchor="middle" fill="#2471a3">46,568</text>
+<polyline points="161.2,344.5 323.8,321.1 486.2,298.2 648.8,275.4" fill="none" stroke="#1e8449" stroke-width="2.5"/>
+<circle cx="161.2" cy="344.5" r="4" fill="#1e8449"/>
+<text x="161.2" y="336.5" font-size="10" text-anchor="middle" fill="#1e8449">1,185</text>
+<circle cx="323.8" cy="321.1" r="4" fill="#1e8449"/>
+<text x="323.8" y="313.1" font-size="10" text-anchor="middle" fill="#1e8449">2,428</text>
+<circle cx="486.2" cy="298.2" r="4" fill="#1e8449"/>
+<text x="486.2" y="290.2" font-size="10" text-anchor="middle" fill="#1e8449">4,908</text>
+<circle cx="648.8" cy="275.4" r="4" fill="#1e8449"/>
+<text x="648.8" y="267.4" font-size="10" text-anchor="middle" fill="#1e8449">9,873</text>
+<rect x="80" y="416" width="12" height="12" fill="#c0392b"/>
+<text x="97" y="426" font-size="12">baseline</text>
+<rect x="166" y="416" width="12" height="12" fill="#2471a3"/>
+<text x="183" y="426" font-size="12">memory</text>
+<rect x="238" y="416" width="12" height="12" fill="#1e8449"/>
+<text x="255" y="426" font-size="12">mea</text>
+</svg>

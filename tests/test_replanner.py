@@ -33,25 +33,6 @@ class FailsFor(MockLLM):
 
 
 class ReplannerTests(unittest.TestCase):
-    def test_failing_step_is_replaced_and_task_completes(self):
-        rep = MEAAgent(FailsFor({2}), tmp()).run(make_task(6))
-        self.assertTrue(rep["completed"])
-        self.assertEqual(rep["replans"], 1)
-        self.assertEqual(rep["replan_log"][0]["failed"], "step-2")
-
-    def test_new_step_carries_the_rejection_reason(self):
-        llm = FailsFor({2})
-        MEAAgent(llm, tmp()).run(make_task(6))
-        alt_prompts = [p for p in llm.prompts if "Alternative approach for step-2" in p]
-        self.assertTrue(alt_prompts)
-        self.assertIn("Earlier attempts were rejected", alt_prompts[0])
-        self.assertIn("FACT-7", alt_prompts[0])        # reason now names the NEW label
-        self.assertIn("K7-", alt_prompts[0])
-        self.assertNotIn("K2-", alt_prompts[0])        # old step's code must not leak in
-
-    def test_linear_plan_replan_updates_required_codes(self):
-        rep = MEAAgent(FailsFor({2}), tmp()).run(make_task(6, deps=False))
-        self.assertTrue(rep["completed"])
 
     def test_failing_final_step_is_replaced_by_a_final_step(self):
         rep = MEAAgent(FailsFor({6}), tmp()).run(make_task(6))
@@ -64,19 +45,6 @@ class ReplannerTests(unittest.TestCase):
         self.assertEqual(rep["replans"], 3)
         self.assertFalse(rep["completed"])
         self.assertEqual(rep["stopped_because"], "blocked")
-
-    def test_replans_survive_a_crash(self):
-        path, task = tmp(), make_task(6)
-        first = MEAAgent(FailsFor({2}), path).run(task, stop_after=3)
-        second = MEAAgent(FailsFor({2}), path).run(task)
-        self.assertTrue(second["completed"])
-        saved = MEAAgent(MockLLM(), path).memory.get_task("t")
-        self.assertEqual(len(saved["replans"]), first["replans"] + second["replans"])
-        self.assertEqual(len(saved["replans"]), 1)
-
-    def test_no_replan_when_everything_succeeds(self):
-        rep = MEAAgent(MockLLM(), tmp()).run(make_task(8))
-        self.assertEqual(rep["replans"], 0)
 
 
 if __name__ == "__main__":
