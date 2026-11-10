@@ -155,8 +155,17 @@ def split_fact(text, step):
 
 def _execute(llm, prompt, step, stats):
     kind = "final" if step.get("final") else "step"
-    r = llm.complete(prompt, kind=kind, max_tokens=700 if step.get("final") else 400,
-                     meta={"index": step_number(step), "code": step["code"], "desc": step["description"]})
+    from .timeouts import LLMTimeout
+    from .llm import estimate_tokens
+    try:
+        r = llm.complete(prompt, kind=kind, max_tokens=700 if step.get("final") else 400,
+                         meta={"index": step_number(step), "code": step["code"], "desc": step["description"]})
+    except LLMTimeout:
+        # interrupted call: count it and return an empty attempt so retry/failure logic runs
+        r = {"text": "", "input_tokens": estimate_tokens(prompt), "output_tokens": 0}
+        stats.add(r)
+        return {"success": False, "message": "", "output": "", "evidence": {},
+                "timeout": True, "timestamp": now()}
     stats.add(r)
     text = r["text"]
     return {"success": bool(text.strip()), "message": fact_text(text, step), "output": text,

@@ -13,6 +13,8 @@ import time
 import urllib.error
 import urllib.request
 
+from agents.timeouts import post_json
+
 
 def estimate_tokens(text):
     return max(1, len(str(text)) // 4)
@@ -97,16 +99,14 @@ class OllamaLLM:
         if not self.host.startswith("http"):
             self.host = "http://" + self.host
         self.num_ctx = int(os.environ.get("LH_NUM_CTX", "8192"))
+        self.timeout = float(os.environ.get("LH_TIMEOUT", "900"))
 
     def complete(self, prompt, kind="step", max_tokens=500, meta=None):
         body = json.dumps({"model": self.model, "prompt": prompt, "stream": False,
                            "options": {"num_predict": max_tokens, "num_ctx": self.num_ctx,
                                        "temperature": 0.2}}).encode()
-        req = urllib.request.Request(self.host + "/api/generate", data=body,
-                                     headers={"content-type": "application/json"})
         try:
-            with urllib.request.urlopen(req, timeout=900) as resp:
-                data = json.loads(resp.read())
+            data = post_json(self.host + "/api/generate", body, self.timeout)
         except urllib.error.HTTPError as exc:
             raise RuntimeError(f"Ollama error {exc.code}: {exc.read().decode(errors='replace')}") from exc
         except urllib.error.URLError as exc:
