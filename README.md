@@ -26,9 +26,8 @@ Optional: [Ollama](https://ollama.com) for a real local model (tested with `qwen
 ~~~
 python -m unittest discover -s tests
 ~~~
-75 tests, about 12 seconds, no model and no network (a fake local server is
-used for the timeout test). The suite is a reduced core set chosen by
-per-test line coverage from an earlier 190 tests.
+151 tests, about 10 seconds, no model and no internet. A few tests start a tiny fake
+server on 127.0.0.1; they skip automatically if the OS blocks loopback sockets.
 
 ## Run on the mock model (offline, fast)
 ~~~

@@ -183,7 +183,7 @@ def main():
     print()
     for s in steps:
         print(f"  {s['id']}: {s['description']}")
-    task = {"task_id": "solve-" + datetime.now().strftime("%Y%m%d-%H%M%S%f"), "goal": goal,
+    task = {"task_id": task_id, "goal": goal,
             "success_criteria": [], "steps": steps}
 
     results = {}

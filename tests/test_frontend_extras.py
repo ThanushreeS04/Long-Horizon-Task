@@ -6,12 +6,16 @@ import unittest
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from net_guard import needs_loopback
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import frontend
 
 ROOT = Path(frontend.__file__).resolve().parent
 
 
+@needs_loopback
 class FrontendExtraTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

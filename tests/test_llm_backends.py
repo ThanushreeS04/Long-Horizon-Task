@@ -1,11 +1,16 @@
 import contextlib
 import io
 import json
+import sys
 import os
 import threading
 import unittest
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from pathlib import Path
 from unittest import mock
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from net_guard import needs_loopback
 
 from agents.llm import AnthropicLLM, MockLLM, OllamaLLM, estimate_tokens, make_llm
 
@@ -30,6 +35,7 @@ class FakeOllama(BaseHTTPRequestHandler):
         pass
 
 
+@needs_loopback
 class OllamaTests(unittest.TestCase):
     def setUp(self):
         FakeOllama.seen, FakeOllama.status = [], 200

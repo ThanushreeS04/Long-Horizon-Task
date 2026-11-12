@@ -6,6 +6,9 @@ import unittest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from net_guard import needs_loopback
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from agents.timeouts import LLMTimeout, post_json
 
@@ -41,6 +44,7 @@ class Server:
         self.srv.server_close()
 
 
+@needs_loopback
 class TimeoutTests(unittest.TestCase):
     def test_slow_server_raises_llmtimeout_quickly(self):
         s = Server(delay=2.0)

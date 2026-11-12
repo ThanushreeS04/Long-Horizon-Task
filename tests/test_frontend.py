@@ -1,9 +1,13 @@
 import http.client
 import json
+import sys
 import threading
 import unittest
 from http.server import ThreadingHTTPServer
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from net_guard import needs_loopback
 
 import frontend
 
@@ -11,6 +15,7 @@ ROOT = Path(frontend.__file__).resolve().parent
 GOOD = {"task": "Plan a product launch", "steps": 3, "backend": "mock"}
 
 
+@needs_loopback
 class FrontendTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
