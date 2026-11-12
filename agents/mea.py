@@ -215,6 +215,11 @@ class MEAAgent:
         self.memory.save_task(state)
         final = next(s for s in state["plan"] if s.get("final"))["id"]
         completed = final in Manager._sets(state)[3] and not state["pending_step_ids"]
+        if completed and not stats.final_verified:      # resumed run: the work was finished earlier
+            stats.final_verified = True
+            saved = next((a for a in reversed(state.get("artifacts", [])) if a.get("text")), None)
+            if saved and not stats.final_output:
+                stats.final_output = saved["text"]
         rep = _report("mea", stats, interrupted, time.perf_counter() - start, mem_s)
         rep.update({"completed": completed, "rounds": rounds, "stopped_because": stopped,
                     "decisions": decisions, "integrity_events": integrity_events,
