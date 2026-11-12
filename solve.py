@@ -19,6 +19,9 @@ from agents.llm import make_llm
 from agents.adapter import format_ledger, merge_ledgers
 from agents.llm_agents import LLMBaselineAgent, LLMMemoryAgent, make_code, make_plan
 from agents.mea import MEAAgent
+from agents.durable import make_durable
+from agents.content_checks import ContentAuditor, ContentManager, default_constraints
+from agents.durable import DurableMemoryManager, make_durable
 
 ROOT = Path(__file__).resolve().parent
 DATA = ROOT / "data"
@@ -91,6 +94,30 @@ def show_work(title, merged, full):
         print(f"\n[{step_id}]\n{shown}")
     print("\n[FINAL REPORT]\n" + (final_text.strip() if final_text else "(no final report was produced)"))
 
+def show_durable(agent, task_id, run_dir):
+    """What the durable layer recorded: journal events, checkpoints, and the resume check."""
+    mem = agent.memory
+    counts = {}
+    for e in mem.journal.read():
+        counts[e["event"]] = counts.get(e["event"], 0) + 1
+    banner(f"DURABILITY  (journal and checkpoints are kept in {run_dir})")
+    print("Journal events :", counts)
+    print("Checkpoints    :", [f"{s}:{r}" for s, r, _, ok in mem.checkpoints(task_id).list()])
+    rep = mem.last_report
+    print("Resume check   :", ("problems=%s actions=%s" % (rep["problems"] or "none", rep["actions"] or "none"))
+          if rep else "fresh start (nothing to reconcile)")
+    print("Run files      :", ", ".join(sorted(p.name for p in run_dir.glob(task_id + "*"))))    
+
+def mk_mea(llm, path, args):
+    """Build the MEA agent. --language adds content checks and constraints,
+    --durable adds journal, checkpoints and safe resume."""
+    kw = {}
+    if args.language:
+        kw["manager"] = ContentManager(default_constraints(args.language) + list(args.constraint or []))
+        kw["auditor"] = ContentAuditor(args.language)
+    agent = MEAAgent(llm, path, replan=args.mea_replan, llm_replan=args.llm_replan,
+                     llm_audit=args.llm_audit, **kw)
+    return make_durable(agent) if args.durable else agent
 
 def main():
     if hasattr(sys.stdout, "reconfigure"):          # model text may contain symbols the Windows console rejects
@@ -121,6 +148,15 @@ def main():
                          "audited round (on_reject = only after a rejection; max 3 calls)")
     ap.add_argument("--llm-audit", action="store_true",
                     help="MEA only: add an advisory model check of each verified step (never blocks)")
+    ap.add_argument("--durable", action="store_true",
+                    help="MEA agent: add journal, checkpoints and safe resume (agents/durable.py)")
+    ap.add_argument("--language", default=None, choices=["python"],
+                    help="MEA only: task language; rejects other-language syntax and invented imports")
+    ap.add_argument("--constraint", action="append", default=[],
+                    help="MEA only: extra rule written into every contract (repeatable)")
+    ap.add_argument("--task-id", default=None,
+                    help="fixed task id. With --only mea --durable, running the same command again after a "
+                         "crash or Ctrl+C RESUMES from data/durable_run instead of starting over")
     args = ap.parse_args()
 
     goal = args.task or input("Enter your task: ").strip()
@@ -132,8 +168,18 @@ def main():
 
     llm = make_llm(args.llm, args.model)
     print(f"\nTask: {goal}\nBackend: {llm.name}   Steps: {n}   Crash after: {k or 'never'}")
-    print("\nPlanning the task ...", flush=True)
-    steps, plan_usage = make_plan(llm, goal, n)
+    task_id = args.task_id or "solve-" + datetime.now().strftime("%Y%m%d-%H%M%S%f")
+    saved = None
+    if args.task_id and args.durable and args.only == "mea":
+        saved_file = DATA / "durable_run" / f"{task_id}_mea.json"
+        if saved_file.exists():
+            saved = DurableMemoryManager(saved_file).get_task(task_id)
+    if saved:
+        print(f"\nResuming {task_id}: reusing the saved plan ({len(saved['pending_step_ids'])} step(s) pending)")
+        steps, plan_usage = saved["plan"], {"input_tokens": 0, "output_tokens": 0}
+    else:
+        print("\nPlanning the task ...", flush=True)
+        steps, plan_usage = make_plan(llm, goal, n)
     print()
     for s in steps:
         print(f"  {s['id']}: {s['description']}")
@@ -175,18 +221,21 @@ def main():
         if args.only in ("all", "mea"):
             banner("MEA AGENT  (Manager -> Executor -> Auditor loop: contracts, fresh context, replanning "
                    + ("ON)" if args.mea_replan else "off)"))
-            mea_path = Path(tmp.name) / f"{task['task_id']}_mea.json"
+            run_dir = (DATA / "durable_run") if args.durable else Path(tmp.name)   # durable files are kept
+            run_dir.mkdir(parents=True, exist_ok=True)
+            mea_path = run_dir / f"{task['task_id']}_mea.json"
             sessions = []
             if k:
                 print(f"Session 1: working, will crash after {k} steps ", end="", flush=True)
-                sessions.append(MEAAgent(llm, mea_path, replan=args.mea_replan, llm_replan=args.llm_replan,
-                                      llm_audit=args.llm_audit).run(task, stop_after=k))
+                sessions.append(mk_mea(llm, mea_path, args).run(task, stop_after=k))
                 print("\nSession 2: reloads the saved state and continues ", end="", flush=True)
             else:
                 print("Working ", end="", flush=True)
-            sessions.append(MEAAgent(llm, mea_path, replan=args.mea_replan, llm_replan=args.llm_replan,
-                                      llm_audit=args.llm_audit).run(task))
+            mea2 = mk_mea(llm, mea_path, args)
+            sessions.append(mea2.run(task))
             print()
+            if args.durable:
+                show_durable(mea2, task["task_id"], run_dir)
             results["mea"] = merge(sessions)
     finally:
         tmp.cleanup()

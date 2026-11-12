@@ -2,6 +2,7 @@
 import hashlib
 import json
 import time
+from contextlib import nullcontext
 
 from .adapter import AgentAdapter, ModelRouter
 from .llm_agents import _Stats, _execute, _report, step_number, step_rules
@@ -27,12 +28,15 @@ class Executor:
                  f"Contract for {contract['step_id']}: {contract['goal']}",
                  "Acceptance criteria:"]
         lines += [f"- {a}" for a in contract["acceptance"]]
+        lines += [f"- {a}" for a in contract.get("extra_acceptance", [])]
+        if contract.get("human_answer"):
+            lines += ["", f"Guidance from the human: {contract['human_answer']}"]
         if contract["evidence"]:
             lines += ["", "Verified facts you may rely on:"]
             lines += [f"[{k}] {v}" for k, v in contract["evidence"].items()]
         if contract["last_rejection"]:
             lines += ["", f"Your previous attempt was rejected. {contract['last_rejection']}"]
-        lines += ["", step_rules(step)]
+        lines += ["", contract.get("rules") or step_rules(step)]   # natural mode supplies its own rules
         return "\n".join(lines)
 
     def run(self, goal, contract, step, stats):
@@ -89,18 +93,27 @@ class MEAAgent:
     until done, blocked, ask, interrupted or the round budget is used up."""
 
     def __init__(self, llm, memory_path, n_max=None, replan=True, router=None,
-                 llm_replan="off", max_llm_replans=3, llm_audit=False):
+                 llm_replan="off", max_llm_replans=3, llm_audit=False, adapter=None,
+                 manager=None, auditor=None, executor=None, state_replanner=None, ask_fn=None):
         self.llm = llm
         self.replan = replan
         self.replanner = Replanner()
         self.memory = MemoryManager(memory_path)
-        self.adapter = AgentAdapter(router or ModelRouter.single(llm))
-        self.manager, self.auditor = Manager(), Auditor()
-        self.executor = Executor(self.adapter.for_role("executor"))
+        self.adapter = adapter or AgentAdapter(router or ModelRouter.single(llm))
+        self.manager, self.auditor = manager or Manager(), auditor or Auditor()
+        self.executor = executor or Executor(self.adapter.for_role("executor"))
+        self.ask_fn = ask_fn          # human-in-the-loop: ask_fn(question) -> answer text or None
         self.n_max = n_max
         self.llm_replanner = (LLMReplanner(self.adapter, llm_replan, max_llm_replans)
                               if llm_replan != "off" else None)
+        if state_replanner is not None:          # model replans after EVERY audited step
+            self.llm_replanner = state_replanner
         self.llm_audit = LLMAuditCheck(self.adapter) if llm_audit else None
+
+    def _timed(self, role, component):
+        """Rule-based roles are timed here; model-based ones are timed by the adapter."""
+        return (nullcontext() if getattr(component, "uses_model", False)
+                else self.adapter.ledger.time_block(role))
 
     def run(self, task, stop_after=None):
         start, stats, mem_s = time.perf_counter(), _Stats(), 0.0
@@ -121,7 +134,7 @@ class MEAAgent:
             if rounds >= n_max:
                 stopped = "round_budget"
                 break
-            with self.adapter.ledger.time_block("manager"):
+            with self._timed("manager", self.manager):
                 d = self.manager.decide(state)
             if d["exhausted"] and self.replan:
                 t0 = time.perf_counter()
@@ -138,6 +151,15 @@ class MEAAgent:
             decisions.append({"round": rounds + 1, "decision": d["decision"],
                               "step": contract["step_id"] if contract else None,
                               "reason": d["reason"]})
+            if d["decision"] == ASK and self.ask_fn is not None:
+                answer = self.ask_fn(d["reason"])
+                if answer and str(answer).strip():          # answered: the manager re-decides
+                    state["answers"][d["step_id"]] = str(answer).strip()
+                    state["question"] = None
+                    self.memory.save_task(state)
+                    decisions.append({"round": rounds + 1, "decision": "ask_answered",
+                                      "step": d["step_id"], "reason": str(answer).strip()[:120]})
+                    continue
             if d["decision"] == DONE:
                 break
             if d["decision"] in (BLOCKED, ASK):
@@ -148,13 +170,13 @@ class MEAAgent:
                         if sid not in state["blocked_step_ids"]:
                             state["blocked_step_ids"].append(sid)
                 else:
-                    state["question"] = d["reason"]
+                    state["question"], state["question_step"] = d["reason"], d.get("step_id")
                 self.memory.save_task(state)
                 mem_s += time.perf_counter() - t0
                 break
             step = next(s for s in state["plan"] if s["id"] == contract["step_id"])
             result = self.executor.run(state["goal"], contract, step, stats)
-            with self.adapter.ledger.time_block("auditor"):
+            with self._timed("auditor", self.auditor):
                 audit = self.auditor.audit(contract, step, result, state)
             if self.llm_audit and audit["verified"]:
                 check = self.llm_audit.check(contract, step, result)

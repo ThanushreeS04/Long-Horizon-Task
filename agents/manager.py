@@ -3,6 +3,7 @@ what happens next. It never runs a step and never sees the environment."""
 import re
 
 from .llm_agents import MAX_ATTEMPTS, make_code, step_number
+from .natural import natural_acceptance, natural_rules
 from .workflow import ready_step
 
 EXECUTE, DONE, BLOCKED, ASK = "execute", "done", "blocked", "ask"
@@ -24,8 +25,9 @@ def acceptance_for(step):
 
 
 class Manager:
-    def __init__(self, max_attempts=MAX_ATTEMPTS):
+    def __init__(self, max_attempts=MAX_ATTEMPTS, natural=False):
         self.max_attempts = max_attempts
+        self.natural = natural          # natural mode: no FACT labels or codes asked of the model
 
     @staticmethod
     def _sets(state):
@@ -78,16 +80,18 @@ class Manager:
             return {"decision": BLOCKED, "contract": None, "reason": why,
                     "exhausted": exhausted}
         if step.get("needs_input") and step["id"] not in state.get("answers", {}):
-            return {"decision": ASK, "contract": None, "exhausted": exhausted,
+            return {"decision": ASK, "contract": None, "exhausted": exhausted, "step_id": step["id"],
                     "reason": step.get("question", f"input needed for {step['id']}")}
         last = [e["reason"] for e in state["errors"] if e["step_id"] == step["id"]]
         deps = self._deps(state, step, replaced)
         contract = {"step_id": step["id"], "goal": step["description"],
-                    "acceptance": acceptance_for(step),
+                    "acceptance": natural_acceptance(step) if self.natural else acceptance_for(step),
+                    "rules": natural_rules(step) if self.natural else None,
                     "depends_on": deps,
                     "evidence": self._evidence(state, deps),
                     "attempt": failures.get(step["id"], 0) + 1,
                     "last_rejection": last[-1] if last else None,
-                    "final": bool(step.get("final"))}
+                    "final": bool(step.get("final")),
+                    "human_answer": state.get("answers", {}).get(step["id"])}
         return {"decision": EXECUTE, "contract": contract,
                 "reason": f"{step['id']} is ready", "exhausted": exhausted}

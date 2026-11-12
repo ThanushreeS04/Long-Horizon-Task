@@ -38,7 +38,36 @@ class MockLLM:
             n = meta["n"]
             text = json.dumps([f"Phase {i + 1}: work on '{clauses[i % len(clauses)]}'" for i in range(n)])
         elif kind == "replan":
-            text = json.dumps([d + " (revised after audit)" for d in meta["descriptions"]])
+            text = json.dumps([d if d.endswith("(revised after audit)") else d + " (revised after audit)"
+                               for d in meta["descriptions"]])
+        elif kind == "grounded_plan":            # synthetic_pipeline.py (Plan-and-Act Sec. 4.2)
+            n = max(1, int(meta.get("action_count", 1)))
+            text = json.dumps({"rationale_summary": "Grouped recorded actions without inventing actions.",
+                               "steps": [{"title": f"Recorded action group {i + 1}", "action_indices": [i]}
+                                         for i in range(n)]})
+        elif kind == "plan_expand":              # Sec. 4.3 plan expansion
+            text = json.dumps({"query": meta.get("query", "Equivalent task phrasing"),
+                               "steps": meta.get("steps", [])})
+        elif kind == "targeted_augment":         # targeted plan augmentation
+            idx = int(meta.get("target_index", 0))
+            text = json.dumps({"query": meta.get("query", "Task") + f" with special attention to action {idx}",
+                               "steps": [{"title": f"Focused action {idx}", "action_indices": [idx]}]})
+        elif kind == "cot_plan":
+            clauses = [c.strip() for c in re.split(r"[,;.]| and | then ", meta["goal"]) if c.strip()]
+            clauses = clauses or [meta["goal"]]
+            text = ("<think>Work out what the goal needs, then order the steps.</think>\n" +
+                    json.dumps([f"Phase {i + 1}: work on '{clauses[i % len(clauses)]}'"
+                                for i in range(meta["n"])]))
+        elif kind == "manager":
+            text = ('<think>The next step is ready and its dependencies are verified.</think>\n'
+                    + json.dumps({"decision": "execute", "contract_goal": "", "extra_acceptance": [],
+                                  "question": ""}))
+        elif kind == "model_audit":
+            text = ('<think>Compared the output with the goal.</think>\n'
+                    '{"verdict": "pass", "reason": "The output carries out the step."}')
+        elif kind == "state_replan":
+            text = ("<think>The new facts do not change the remaining steps.</think>\n"
+                    + json.dumps(meta["descriptions"]))
         elif kind == "audit":
             text = "YES. The output carries out the step."
         elif kind == "final":
@@ -46,10 +75,18 @@ class MockLLM:
             for num, val in re.findall(r'FACT-(\d+): ([^"\\\n]*)', prompt):
                 seen.setdefault(int(num), val.strip())
             lines = [f"FACT-{k}: {v}" for k, v in sorted(seen.items())]
-            text = "FINAL REPORT\n" + "\n".join(lines) + "\nAll visible facts are listed above."
+            tail = "\nAll visible facts are listed above."
+            if "lists every FACT-n line" not in prompt:    # natural mode: combine the earlier work shown as [step-n] text
+                work = re.findall(r"^\[(step-\d+)\] (.+)$", prompt, re.M)
+                lines = [f"{sid}: {' '.join(body.split())[:160]}" for sid, body in work]
+                tail = "\nThe earlier verified work is combined above. " + self.FILLER
+            text = (("<think>List every fact I was given.</think>\n" if "<think>" in prompt else "")
+                    + "FINAL REPORT\n" + "\n".join(lines) + tail)
         else:
             i, code = meta["index"], meta["code"]
-            text = f"FACT-{i}: Step {i} established {code}.\n" + self.FILLER * 4
+            think = "<think>Restate the contract, do the work, include the code.</think>\n" \
+                if "<think>" in prompt else ""
+            text = think + f"FACT-{i}: Step {i} established {code}.\n" + self.FILLER * 4
         return {"text": text,
                 "input_tokens": estimate_tokens(prompt),
                 "output_tokens": estimate_tokens(text)}
@@ -77,7 +114,8 @@ class AnthropicLLM:
                     data = json.loads(resp.read())
                 break
             except urllib.error.HTTPError as exc:
-                detail = exc.read().decode(errors="replace")
+                with exc:                                   # close the response so it isn't left open
+                    detail = exc.read().decode(errors="replace")
                 if exc.code in (429, 500, 529) and attempt < 3:
                     time.sleep(2 ** attempt)
                     continue
@@ -108,7 +146,9 @@ class OllamaLLM:
         try:
             data = post_json(self.host + "/api/generate", body, self.timeout)
         except urllib.error.HTTPError as exc:
-            raise RuntimeError(f"Ollama error {exc.code}: {exc.read().decode(errors='replace')}") from exc
+            with exc:                                       # close the response so it isn't left open
+                detail = exc.read().decode(errors="replace")
+            raise RuntimeError(f"Ollama error {exc.code}: {detail}") from exc
         except urllib.error.URLError as exc:
             raise RuntimeError(f"Cannot reach Ollama at {self.host}. Is it running? ({exc.reason})") from exc
         text = data.get("response", "")

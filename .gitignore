@@ -7,3 +7,12 @@ data/*
 outputs/
 *_backup.py
 *.bak
+
+
+__pycache__/
+*.pyc
+data/durable_run/
+data/*.json
+outputs/
+*.corrupt-*
+*.bak
